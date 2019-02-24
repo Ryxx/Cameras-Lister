@@ -19,6 +19,7 @@
 bl_info = {
     "name": "Cameras Lister",
     "author": "Ryxx",
+    "version": (1, 4),
     "blender": (2, 80, 0),
     "description": "Lists all cameras from the scene and allows to easily set the view to a particular one.",
     "location": "Camera Lister Panel shortcut: Alt + C",
@@ -34,7 +35,7 @@ from bpy.types import Operator, Menu, Panel, AddonPreferences
 #--------------------------------------------------------------------------------------
 
 # CAMERA VIEW ON
-class CameraViewOn(Operator):
+class CameraViewOn(bpy.types.Operator):
     bl_idname = 'cameras.camera_view_on'
     bl_label = 'Camera View On'
     bl_description = "Camera View On"
@@ -46,7 +47,7 @@ class CameraViewOn(Operator):
         return{'FINISHED'}
 
 # CAMERA VIEW OFF
-class CameraViewOff(Operator):
+class CameraViewOff(bpy.types.Operator):
     bl_idname = 'cameras.camera_view_off'
     bl_label = 'Camera View Off'
     bl_description = "Camera View Off"
@@ -58,7 +59,7 @@ class CameraViewOff(Operator):
         return{'FINISHED'}
 
 # VIEW FROM SELECTED CAMERA
-class ViewFromSelectedCamera(Operator):
+class ViewFromSelectedCamera(bpy.types.Operator):
     bl_idname = 'cameras.view_from_selected'
     bl_label = 'View From Selected'
     bl_description = "Switch to view from selected camera"
@@ -73,7 +74,7 @@ class ViewFromSelectedCamera(Operator):
         return{'FINISHED'}
 
 # ALIGN SELECTED CAMERA TO VIEW
-class AlignSelectedCameraToView(Operator):
+class AlignSelectedCameraToView(bpy.types.Operator):
     bl_idname = 'cameras.align_selected_to_view'
     bl_label = 'New Camera From View'
     bl_description = "Create a new camera from view"
@@ -95,7 +96,7 @@ class AlignSelectedCameraToView(Operator):
         return{'FINISHED'}
 
 # NEW CAMERA FROM VIEW
-class NewCameraFromView(Operator):
+class NewCameraFromView(bpy.types.Operator):
     bl_idname = 'cameras.new_from_view'
     bl_label = 'New Camera From View'
     bl_description = "Create a new camera from view"
@@ -124,7 +125,7 @@ bpy.types.Scene.sort_cameras = bpy.props.EnumProperty(
     default= "alphabetically")
 
 # SET CAMERA VIEW
-class SetCameraView(Operator):
+class SetCameraView(bpy.types.Operator):
     bl_idname = 'cameras.set_view'
     bl_label = 'Set Camera View'
     bl_description = "Set View to this Camera"
@@ -138,8 +139,57 @@ class SetCameraView(Operator):
 
         return{'FINISHED'}
 
-# Common Draw()
-def common_draw(self, context):
+# SELECT CAMERA
+class SelectCamera(bpy.types.Operator):
+    bl_idname = 'cameras.select'
+    bl_label = 'Select Camera'
+    bl_description = "Select camera"
+    bl_options = {'UNDO'}
+
+    camera: bpy.props.StringProperty()
+
+    def execute(self,context):
+        
+        if context.object:
+            if context.object.select_get():
+                context.object.select_set(state=False)
+                cam=bpy.data.objects[self.camera]
+                cam.select_set(state=True)
+                context.view_layer.objects.active = cam
+                context.scene.camera=cam
+
+        return{'FINISHED'}
+
+# DELETE CAMERA
+class DeleteCamera(bpy.types.Operator):
+    bl_idname = 'cameras.delete'
+    bl_label = 'Delete Camera'
+    bl_description = "Delete camera"
+    bl_options = {'UNDO'}
+
+    camera: bpy.props.StringProperty()
+
+    def execute(self,context):
+        cam=bpy.data.objects[self.camera]
+        bpy.data.objects.remove(cam)
+        
+        return{'FINISHED'}
+
+#--------------------------------------------------------------------------------------
+# C O M M O N   D R A W   P A N E L
+#--------------------------------------------------------------------------------------
+
+# COMMON DRAW
+def draw_interact(self, layout, context):
+    box = layout
+    row = box.row(align = False)
+    row.operator("cameras.camera_view_on", text="Camera View On", icon="VIEW_CAMERA")
+    row.operator("cameras.camera_view_off", text="Camera View Off", icon="CAMERA_DATA")
+    box.operator("cameras.view_from_selected", text="View from Selected", icon="TRIA_RIGHT")
+    box.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="TRIA_RIGHT")
+    box.operator("cameras.new_from_view", text="New Camera from View", icon="TRIA_RIGHT")
+
+def draw_lister(self,layout,context):
     def coll_rec(coll, clist):
         if coll.children:
             for child in coll.children:
@@ -148,21 +198,8 @@ def common_draw(self, context):
         if cams:
             cams.sort(key=str.lower)
             clist.append((coll.name, cams))
-    
-    layout = self.layout
 
-    box = layout.column(align=True)
-    box.label(text="CAMERA INTERACTIVITY", icon="DISCLOSURE_TRI_RIGHT")
-    row = box.row(align = False)
-    box.separator()
-    row.operator("cameras.camera_view_on", text="Camera View On", icon="VIEW_CAMERA")
-    row.operator("cameras.camera_view_off", text="Camera View Off", icon="CAMERA_DATA")
-    box.operator("cameras.view_from_selected", text="View from Selected", icon="TRIA_RIGHT")
-    box.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="TRIA_RIGHT")
-    box.operator("cameras.new_from_view", text="New Camera from View", icon="TRIA_RIGHT")
-    
-    box.separator()
-    box.label(text="SCENE CAMERAS LIST", icon="DISCLOSURE_TRI_RIGHT")
+    box = layout
     row = box.row(align=True)
     row.prop(context.scene, "sort_cameras", text=" ", expand=True)
     box.separator()
@@ -190,55 +227,23 @@ def common_draw(self, context):
                 row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
                 row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
 
-
-# SELECT CAMERA
-class SelectCamera(Operator):
-    bl_idname = 'cameras.select'
-    bl_label = 'Select Camera'
-    bl_description = "Select camera"
-    bl_options = {'UNDO'}
-
-    camera: bpy.props.StringProperty()
-
-    def execute(self,context):
-        
-        if context.object:
-            if context.object.select_get():
-                context.object.select_set(state=False)
-                cam=bpy.data.objects[self.camera]
-                cam.select_set(state=True)
-                context.view_layer.objects.active = cam
-                context.scene.camera=cam
-
-        return{'FINISHED'}
-
-# DELETE CAMERA
-class DeleteCamera(Operator):
-    bl_idname = 'cameras.delete'
-    bl_label = 'Delete Camera'
-    bl_description = "Delete camera"
-    bl_options = {'UNDO'}
-
-    camera: bpy.props.StringProperty()
-
-    def execute(self,context):
-        cam=bpy.data.objects[self.camera]
-        bpy.data.objects.remove(cam)
-        
-        return{'FINISHED'}
-
 #--------------------------------------------------------------------------------------
 # P A N E L
 #--------------------------------------------------------------------------------------
 
-# CAMERAS LISTER
-class CamerasLister(Operator):
+# FLOATING PANEL
+class VIEW3D_PT_FloatingPanel(Operator):
     bl_label = "Cameras Lister"
     bl_idname = "cameras.lister"
 
     def draw(self, context):
-        common_draw(self, context)
-
+        layout = self.layout
+        box = layout.column(align=True)
+        box.label(text="CAMERAS LISTER", icon="OUTLINER_OB_CAMERA")
+        draw_interact(self, box, context)
+        box.separator()
+        draw_lister(self, box, context)
+        
     def invoke(self, context, event):
         wm = context.window_manager
         return wm.invoke_popup(self)
@@ -247,34 +252,33 @@ class CamerasLister(Operator):
         self.report({'INFO'}, self.my_enum)
         return {'FINISHED'}
 
-# OPTIONAL PANEL
-class VIEW3D_PT_cameraslister(Panel):
+# DOCKED IN SIDE PANEL
+class VIEW3D_PT_DockedInSidePanel(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "Cameras"
+    bl_category = "View"
     bl_label = "Cameras Lister"
     
     def draw(self, context):
-        common_draw(self, context)
-    
+        draw_interact(self, self.layout, context)
+        draw_lister(self, self.layout, context)
+
+# ADDON PREFERENCES
 class CamerasListerPreferences(AddonPreferences):
     bl_idname = __name__
 
     def sp_toggle(self, context):
         if self.add_side_panel:
-            bpy.utils.register_class(VIEW3D_PT_cameraslister)
+            bpy.utils.register_class(VIEW3D_PT_DockedInSidePanel)
         else:
-            if hasattr(bpy.types, 'VIEW3D_PT_cameraslister'):
-                bpy.utils.unregister_class
-
-    add_side_panel: bpy.props.BoolProperty(name="side_panel", default=False, update=sp_toggle)
+            if hasattr(bpy.types, 'VIEW3D_PT_DockedInSidePanel'):
+                bpy.utils.unregister_class(VIEW3D_PT_DockedInSidePanel)
+                
+    add_side_panel: bpy.props.BoolProperty(name="side panel", default=False, update=sp_toggle)
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Custom settings:")
-        split=layout.split()
-        split.label(text="Add CamerasLister to Side Panel:")
-        split.prop(self, "add_side_panel")
+        layout.prop(self, "add_side_panel", text="Add CamerasLister to Side Panel")
 
 #--------------------------------------------------------------------------------------
 # R E G I S T R Y
@@ -289,7 +293,7 @@ classes = (
     SetCameraView,
     SelectCamera,
     DeleteCamera,
-    CamerasLister,
+    VIEW3D_PT_FloatingPanel,
     CamerasListerPreferences
 )
 
@@ -309,9 +313,8 @@ def unregister():
     from bpy.utils import unregister_class
     for cls in classes:
         unregister_class(cls)
-    if hasattr(bpy.types, 'VIEW3D_PT_cameraslister'):
-        bpy.utils.unregister_class(VIEW3D_PT_cameraslister)
-    
+    if hasattr(bpy.types, 'VIEW3D_PT_DockedInSidePanel'):
+        bpy.utils.unregister_class(VIEW3D_PT_DockedInSidePanel)
 
     addon_keymaps = []
     
