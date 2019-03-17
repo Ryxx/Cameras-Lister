@@ -383,7 +383,6 @@ classes = (
     BindCameraToMarker,
     DeleteCamera,
     VIEW3D_PT_FloatingPanel,
-    VIEW3D_PT_DockedInSidePanel,
     CamerasListerPreferences
 )
 
