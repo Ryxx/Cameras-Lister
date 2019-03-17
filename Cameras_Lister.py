@@ -19,7 +19,7 @@
 bl_info = {
     "name": "Cameras Lister",
     "author": "Ryxx",
-    "version": (1, 4),
+    "version": (1, 4, 1),
     "blender": (2, 80, 0),
     "description": "Lists all cameras from the scene and allows to easily set the view to a particular one.",
     "location": "Camera Lister Panel shortcut: Alt + C",
@@ -29,6 +29,18 @@ bl_info = {
 
 import bpy
 from bpy.types import Operator, Menu, Panel, AddonPreferences
+
+#--------------------------------------------------------------------------------------
+# T O   D O   L I S T
+#--------------------------------------------------------------------------------------
+
+# Issue: BindCameraToMarker - When the camera is deleted, its marker still stays on the timeline.
+# Feature: BindCameraToMarker - Being able to delete the marker from the addon panel.
+# Feature: BindCameraToMarker - Replacing a current marker by another from another camera.
+# Feature: RenameCamera: Being able to rename the camera directly from the addon panel.
+# Feature: Preferences - Allow user to choose FloatingPanel's shortcut / DockedInSidePanel's tab category.
+# Optimization: Remove CameraViewOn / CameraViewOff buttons and instead, make the current camera's button clickable again, to switch to CamViewOff
+# Optimization: Put a CAMERA_DATA icon for the current Camera View On.
 
 #--------------------------------------------------------------------------------------
 # F U N C T I O N A L I T I E S
@@ -153,11 +165,37 @@ class SelectCamera(bpy.types.Operator):
         if context.object:
             if context.object.select_get():
                 context.object.select_set(state=False)
-                cam=bpy.data.objects[self.camera]
-                cam.select_set(state=True)
-                context.view_layer.objects.active = cam
-                context.scene.camera=cam
+        cam=bpy.data.objects[self.camera]
+        cam.select_set(state=True)
+        context.view_layer.objects.active = cam
+        context.scene.camera=cam
 
+        return{'FINISHED'}
+
+# BIND CAMERA TO MARKER
+class BindCameraToMarker(bpy.types.Operator):
+    bl_idname = 'cameras.bind_to_marker'
+    bl_label = 'Bind Camera to Marker'
+    bl_description = "Bind camera to marker at current frame"
+    bl_options = {'UNDO'}
+
+    camera: bpy.props.StringProperty()
+
+    def execute(self,context):
+                
+        tm = bpy.context.scene.timeline_markers
+        cur_frame = context.scene.frame_current
+
+        frame_markers = [marker for marker in tm if marker.frame == cur_frame]
+
+        if len(frame_markers) == 0:
+            new_marker = tm.new(self.camera, frame = cur_frame)
+            new_marker.camera = bpy.data.objects[self.camera]
+        elif len(frame_markers) == 1:
+            frame_markers[0].camera = bpy.data.objects[self.camera]
+        elif len(frame_markers) >= 2:
+            frame_markers[0].camera = bpy.data.objects[self.camera]
+        
         return{'FINISHED'}
 
 # DELETE CAMERA
@@ -180,16 +218,57 @@ class DeleteCamera(bpy.types.Operator):
 #--------------------------------------------------------------------------------------
 
 # COMMON DRAW
-def draw_interact(self, layout, context):
-    box = layout
-    row = box.row(align = False)
-    row.operator("cameras.camera_view_on", text="Camera View On", icon="VIEW_CAMERA")
-    row.operator("cameras.camera_view_off", text="Camera View Off", icon="CAMERA_DATA")
-    box.operator("cameras.view_from_selected", text="View from Selected", icon="TRIA_RIGHT")
-    box.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="TRIA_RIGHT")
-    box.operator("cameras.new_from_view", text="New Camera from View", icon="TRIA_RIGHT")
+#def draw_interact(self, layout, context):
+#    box = layout
+#    row = box.row(align = False)
+#    row.operator("cameras.camera_view_on", text="Camera View On", icon="VIEW_CAMERA")
+#    row.operator("cameras.camera_view_off", text="Camera View Off", icon="CAMERA_DATA")
+#    box.operator("cameras.view_from_selected", text="View from Selected", icon="TRIA_RIGHT")
+#    box.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="TRIA_RIGHT")
+#    box.operator("cameras.new_from_view", text="New Camera from View", icon="TRIA_RIGHT")
 
-def draw_lister(self,layout,context):
+#def draw_lister(self,layout,context):
+#    def coll_rec(coll, clist):
+#        if coll.children:
+#            for child in coll.children:
+#                coll_rec(child, clist)
+#        cams=[cam.name for cam in coll.objects if cam.type=='CAMERA']
+#        if cams:
+#            cams.sort(key=str.lower)
+#            clist.append((coll.name, cams))
+
+#    box = layout
+#    row = box.row(align=True)
+#    row.prop(context.scene, "sort_cameras", text=" ", expand=True)
+#    box.separator()
+#    boxframe = box.box()
+#    boxframecolumn = boxframe.column()
+#    sort_option = context.scene.sort_cameras
+#    if sort_option == sorting_cameras_options[0][0]:
+#        cam_list=[cam.name for cam in context.scene.collection.all_objects if cam.type=='CAMERA']
+#        cam_list.sort(key=str.lower)
+#        for cam in cam_list:
+#            row = boxframecolumn.row(align=True)
+#            row.operator("cameras.set_view", text=cam).camera=cam
+#            row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
+#            row.operator("cameras.bind_to_marker", text="", icon="MARKER").camera=cam
+#            row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
+#    elif sort_option == sorting_cameras_options[1][0]:
+#        collcamlist=[]
+#        master_coll = context.scene.collection
+#        coll_rec(master_coll, collcamlist)
+#        collcamlist.sort()
+#        for coll in collcamlist:
+#            boxframecolumn.label(text=coll[0])
+#            for cam in coll[1]:
+#                row = boxframecolumn.row(align=True)
+#                row.operator("cameras.set_view", text=cam).camera=cam
+#                row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
+#                row.operator("cameras.bind_to_marker", text="", icon="MARKER").camera=cam
+#                row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
+
+# COMMON DRAW
+def common_draw(self,layout,context):
     def coll_rec(coll, clist):
         if coll.children:
             for child in coll.children:
@@ -200,6 +279,13 @@ def draw_lister(self,layout,context):
             clist.append((coll.name, cams))
 
     box = layout
+    row = box.row(align = False)
+    row.operator("cameras.camera_view_on", text="Camera View On", icon="VIEW_CAMERA")
+    row.operator("cameras.camera_view_off", text="Camera View Off", icon="CAMERA_DATA")
+    box.operator("cameras.view_from_selected", text="View from Selected", icon="TRIA_RIGHT")
+    box.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="TRIA_RIGHT")
+    box.operator("cameras.new_from_view", text="New Camera from View", icon="TRIA_RIGHT")
+    box.separator()
     row = box.row(align=True)
     row.prop(context.scene, "sort_cameras", text=" ", expand=True)
     box.separator()
@@ -213,6 +299,7 @@ def draw_lister(self,layout,context):
             row = boxframecolumn.row(align=True)
             row.operator("cameras.set_view", text=cam).camera=cam
             row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
+            row.operator("cameras.bind_to_marker", text="", icon="MARKER").camera=cam
             row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
     elif sort_option == sorting_cameras_options[1][0]:
         collcamlist=[]
@@ -225,6 +312,8 @@ def draw_lister(self,layout,context):
                 row = boxframecolumn.row(align=True)
                 row.operator("cameras.set_view", text=cam).camera=cam
                 row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
+                row.operator("cameras.rename", text="", icon="FONT_DATA").camera=cam
+                row.operator("cameras.bind_to_marker", text="", icon="MARKER").camera=cam
                 row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
 
 #--------------------------------------------------------------------------------------
@@ -240,9 +329,8 @@ class VIEW3D_PT_FloatingPanel(Operator):
         layout = self.layout
         box = layout.column(align=True)
         box.label(text="CAMERAS LISTER", icon="OUTLINER_OB_CAMERA")
-        draw_interact(self, box, context)
         box.separator()
-        draw_lister(self, box, context)
+        common_draw(self, box, context)
         
     def invoke(self, context, event):
         wm = context.window_manager
@@ -260,8 +348,8 @@ class VIEW3D_PT_DockedInSidePanel(Panel):
     bl_label = "Cameras Lister"
     
     def draw(self, context):
-        draw_interact(self, self.layout, context)
-        draw_lister(self, self.layout, context)
+        col = self.layout.column(align=True)
+        common_draw(self, col, context)
 
 # ADDON PREFERENCES
 class CamerasListerPreferences(AddonPreferences):
@@ -292,8 +380,10 @@ classes = (
     NewCameraFromView,
     SetCameraView,
     SelectCamera,
+    BindCameraToMarker,
     DeleteCamera,
     VIEW3D_PT_FloatingPanel,
+    VIEW3D_PT_DockedInSidePanel,
     CamerasListerPreferences
 )
 
