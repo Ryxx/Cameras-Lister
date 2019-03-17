@@ -43,7 +43,7 @@ from bpy.types import Operator, Menu, Panel, AddonPreferences
 # Optimization: Put a CAMERA_DATA icon for the current Camera View On.
 
 #--------------------------------------------------------------------------------------
-# F U N C T I O N A L I T I E S
+# F E A T U R E S
 #--------------------------------------------------------------------------------------
 
 # CAMERA VIEW ON
