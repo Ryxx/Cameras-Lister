@@ -34,7 +34,6 @@ from bpy.types import Operator, Menu, Panel, AddonPreferences
 # T O   D O   L I S T
 #--------------------------------------------------------------------------------------
 
-# Issue: BindCameraToMarker - When the camera is deleted, its marker still stays on the timeline.
 # Feature: BindCameraToMarker - Being able to delete the marker from the addon panel.
 # Feature: BindCameraToMarker - Replacing a current marker by another from another camera.
 # Feature: RenameCamera: Being able to rename the camera directly from the addon panel.
@@ -211,61 +210,16 @@ class DeleteCamera(bpy.types.Operator):
         cam=bpy.data.objects[self.camera]
         bpy.data.objects.remove(cam)
         
+        tm = bpy.context.scene.timeline_markers
+        for marker in tm:
+            if marker.name == self.camera:
+                 tm.remove(marker)
+        
         return{'FINISHED'}
 
 #--------------------------------------------------------------------------------------
 # C O M M O N   D R A W   P A N E L
 #--------------------------------------------------------------------------------------
-
-# COMMON DRAW
-#def draw_interact(self, layout, context):
-#    box = layout
-#    row = box.row(align = False)
-#    row.operator("cameras.camera_view_on", text="Camera View On", icon="VIEW_CAMERA")
-#    row.operator("cameras.camera_view_off", text="Camera View Off", icon="CAMERA_DATA")
-#    box.operator("cameras.view_from_selected", text="View from Selected", icon="TRIA_RIGHT")
-#    box.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="TRIA_RIGHT")
-#    box.operator("cameras.new_from_view", text="New Camera from View", icon="TRIA_RIGHT")
-
-#def draw_lister(self,layout,context):
-#    def coll_rec(coll, clist):
-#        if coll.children:
-#            for child in coll.children:
-#                coll_rec(child, clist)
-#        cams=[cam.name for cam in coll.objects if cam.type=='CAMERA']
-#        if cams:
-#            cams.sort(key=str.lower)
-#            clist.append((coll.name, cams))
-
-#    box = layout
-#    row = box.row(align=True)
-#    row.prop(context.scene, "sort_cameras", text=" ", expand=True)
-#    box.separator()
-#    boxframe = box.box()
-#    boxframecolumn = boxframe.column()
-#    sort_option = context.scene.sort_cameras
-#    if sort_option == sorting_cameras_options[0][0]:
-#        cam_list=[cam.name for cam in context.scene.collection.all_objects if cam.type=='CAMERA']
-#        cam_list.sort(key=str.lower)
-#        for cam in cam_list:
-#            row = boxframecolumn.row(align=True)
-#            row.operator("cameras.set_view", text=cam).camera=cam
-#            row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
-#            row.operator("cameras.bind_to_marker", text="", icon="MARKER").camera=cam
-#            row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
-#    elif sort_option == sorting_cameras_options[1][0]:
-#        collcamlist=[]
-#        master_coll = context.scene.collection
-#        coll_rec(master_coll, collcamlist)
-#        collcamlist.sort()
-#        for coll in collcamlist:
-#            boxframecolumn.label(text=coll[0])
-#            for cam in coll[1]:
-#                row = boxframecolumn.row(align=True)
-#                row.operator("cameras.set_view", text=cam).camera=cam
-#                row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
-#                row.operator("cameras.bind_to_marker", text="", icon="MARKER").camera=cam
-#                row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
 
 # COMMON DRAW
 def common_draw(self,layout,context):
@@ -312,7 +266,6 @@ def common_draw(self,layout,context):
                 row = boxframecolumn.row(align=True)
                 row.operator("cameras.set_view", text=cam).camera=cam
                 row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
-                row.operator("cameras.rename", text="", icon="FONT_DATA").camera=cam
                 row.operator("cameras.bind_to_marker", text="", icon="MARKER").camera=cam
                 row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
 
