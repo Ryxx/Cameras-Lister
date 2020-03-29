@@ -18,44 +18,35 @@
 
 bl_info = {
     "name": "Cameras Lister",
-    "author": "Ryxx",
-    "version": (1, 4, 1),
-    "blender": (2, 80, 0),
+    "blender": (2, 82, 0),
     "description": "Lists all cameras from the scene and allows to easily set the view to a particular one.",
-    "location": "Camera Lister Panel shortcut: Alt + C",
-    "support": "COMMUNITY",
+    "location": "Camera Lister's panel shortcut: Alt + C",
     "category": "Camera"
 }
 
 import bpy
-from bpy.types import Operator, Menu, Panel, AddonPreferences
-
-#--------------------------------------------------------------------------------------
-# T O   D O   L I S T
-#--------------------------------------------------------------------------------------
-
-# Feature: BindCameraToMarker - Being able to delete the marker from the addon panel.
-# Feature: BindCameraToMarker - Replacing a current marker by another from another camera.
-# Feature: RenameCamera: Being able to rename the camera directly from the addon panel.
-# Feature: Preferences - Allow user to choose FloatingPanel's shortcut / DockedInSidePanel's tab category.
-# Optimization: Remove CameraViewOn / CameraViewOff buttons and instead, make the current camera's button clickable again, to switch to CamViewOff
-# Optimization: Put a CAMERA_DATA icon for the current Camera View On.
+from bpy.types import Operator, Menu, Panel, PropertyGroup, PointerProperty, Object
 
 #--------------------------------------------------------------------------------------
 # F E A T U R E S
 #--------------------------------------------------------------------------------------
 
-# CAMERA VIEW ON
-class CameraViewOn(bpy.types.Operator):
-    bl_idname = 'cameras.camera_view_on'
-    bl_label = 'Camera View On'
-    bl_description = "Camera View On"
-    bl_options = {'UNDO'}
+# CAMERA'S CUSTOM RESOLUTION
+class Camera_Custom_Resolution_Settings(PropertyGroup):
+    Custom_Horizontal_Resolution: bpy.props.IntProperty(
+        name="Custom Horizontal Resolution",
+        description="Custom Horizontal Resolution",
+        default = 1920)
+        
+    Custom_Vertical_Resolution: bpy.props.IntProperty(
+        name="Custom Vertical Resolution",
+        description="Custom Vertical Resolution",
+        default = 1080)
 
-    def execute(self,context):
-        context.area.spaces[0].region_3d.view_perspective='CAMERA'
-
-        return{'FINISHED'}
+# SET CAMERA CUSTOM RESOLUTION
+def SetCameraCustomResolution(self, context):
+    context.scene.render.resolution_x = context.active_object.camera_custom_resolution_settings_pointer_prop.Custom_Horizontal_Resolution
+    context.scene.render.resolution_y = context.active_object.camera_custom_resolution_settings_pointer_prop.Custom_Vertical_Resolution
 
 # CAMERA VIEW OFF
 class CameraViewOff(bpy.types.Operator):
@@ -63,32 +54,19 @@ class CameraViewOff(bpy.types.Operator):
     bl_label = 'Camera View Off'
     bl_description = "Camera View Off"
     bl_options = {'UNDO'}
+
+    camera: bpy.props.StringProperty()
     
     def execute(self,context):
         context.area.spaces[0].region_3d.view_perspective='PERSP'
 
         return{'FINISHED'}
 
-# VIEW FROM SELECTED CAMERA
-class ViewFromSelectedCamera(bpy.types.Operator):
-    bl_idname = 'cameras.view_from_selected'
-    bl_label = 'View From Selected'
-    bl_description = "Switch to view from selected camera"
-    bl_options = {'UNDO'}
-
-    def execute(self,context):
-        if context.object:
-            ob = context.object
-            if ob.type == 'CAMERA':
-                bpy.ops.view3d.object_as_camera()
-
-        return{'FINISHED'}
-
 # ALIGN SELECTED CAMERA TO VIEW
 class AlignSelectedCameraToView(bpy.types.Operator):
     bl_idname = 'cameras.align_selected_to_view'
-    bl_label = 'New Camera From View'
-    bl_description = "Create a new camera from view"
+    bl_label = 'Align Selected to View'
+    bl_description = "Align selected camera to view"
     bl_options = {'UNDO'}
 
     def execute(self,context):
@@ -98,8 +76,7 @@ class AlignSelectedCameraToView(bpy.types.Operator):
             else:
                 ob = context.object
                 if ob.type == 'CAMERA':
-                    context = bpy.context
-                    scene = context.scene
+                    scene = bpy.context.scene
                     currentCameraObj = bpy.data.objects[bpy.context.active_object.name]
                     scene.camera = currentCameraObj
                     bpy.ops.view3d.camera_to_view()
@@ -117,8 +94,7 @@ class NewCameraFromView(bpy.types.Operator):
         if context.area.spaces[0].region_3d.view_perspective == 'CAMERA':
             context.area.spaces[0].region_3d.view_perspective='PERSP'
         bpy.ops.object.camera_add()
-        context = bpy.context
-        scene = context.scene
+        scene = bpy.context.scene
         currentCameraObj = bpy.data.objects[bpy.context.active_object.name]
         scene.camera = currentCameraObj
         bpy.ops.view3d.camera_to_view()
@@ -147,6 +123,8 @@ class SetCameraView(bpy.types.Operator):
     def execute(self,context):
         bpy.ops.cameras.select(camera=self.camera)
         bpy.ops.view3d.object_as_camera()
+        
+        SetCameraCustomResolution(self, context)
 
         return{'FINISHED'}
 
@@ -169,6 +147,8 @@ class SelectCamera(bpy.types.Operator):
         context.view_layer.objects.active = cam
         context.scene.camera=cam
 
+        SetCameraCustomResolution(self, context)
+
         return{'FINISHED'}
 
 # BIND CAMERA TO MARKER
@@ -184,17 +164,38 @@ class BindCameraToMarker(bpy.types.Operator):
                 
         tm = bpy.context.scene.timeline_markers
         cur_frame = context.scene.frame_current
-
         frame_markers = [marker for marker in tm if marker.frame == cur_frame]
 
         if len(frame_markers) == 0:
             new_marker = tm.new(self.camera, frame = cur_frame)
             new_marker.camera = bpy.data.objects[self.camera]
-        elif len(frame_markers) == 1:
-            frame_markers[0].camera = bpy.data.objects[self.camera]
-        elif len(frame_markers) >= 2:
-            frame_markers[0].camera = bpy.data.objects[self.camera]
+        elif len(frame_markers) >= 1:
+            for marker in frame_markers:
+                tm.remove(marker)
+            new_marker = tm.new(self.camera, frame = cur_frame)
+            new_marker.camera = bpy.data.objects[self.camera]
         
+        return{'FINISHED'}
+
+# DELETE CAMERA MARKER
+class Delete_Camera_Marker(bpy.types.Operator):
+    bl_idname = 'cameras.delete_camera_marker'
+    bl_label = 'Delete Camera Marker'
+    bl_description = "Delete camera marker at current frame"
+    bl_options = {'UNDO'}
+
+    camera: bpy.props.StringProperty()
+
+    def execute(self,context):
+        
+        tm = bpy.context.scene.timeline_markers
+        cur_frame = context.scene.frame_current
+        frame_markers = [marker for marker in tm if marker.frame == cur_frame]
+        
+        for marker in frame_markers:
+            if marker.name == self.camera:
+                tm.remove(frame_markers[0])
+
         return{'FINISHED'}
 
 # DELETE CAMERA
@@ -217,6 +218,90 @@ class DeleteCamera(bpy.types.Operator):
         
         return{'FINISHED'}
 
+# PANEL BUTTON - CAMERA SETTINGS
+class PanelButton_CameraSettings(bpy.types.Operator):
+    bl_idname = "camera.settings"
+    bl_label = "Camera Settings"
+    bl_description = "Select camera"
+    bl_options = {'UNDO'}
+
+    camera: bpy.props.StringProperty()
+
+    def execute(self,context):
+        pass
+
+    def draw(self, context):
+        layout = self.layout
+
+        cam = bpy.context.object.data
+        layout.label(text="RENDER SETTINGS", icon="RESTRICT_RENDER_OFF")
+        col = layout.column(align=False)
+        row = col.row()
+        row.prop(cam, "type", text="")
+        
+        if cam.type == 'PERSP':
+            row = col.row()
+            row.prop(cam, "lens_unit", text="")
+            if cam.lens_unit == 'MILLIMETERS':
+                row.prop(cam, "lens", text="Focal")
+            elif cam.lens_unit == 'FOV':
+                row.prop(cam, "angle", text="Field of View")
+            
+        elif cam.type == 'ORTHO':
+            row.prop(cam, "ortho_scale", text="Scale")
+            
+        elif cam.type == 'PANO':
+            engine = context.engine
+            if engine == 'CYCLES':
+                ccam = cam.cycles
+                row.prop(ccam, "panorama_type", text="")
+                
+                if ccam.panorama_type == 'FISHEYE_EQUIDISTANT':
+                    row = col.row()
+                    row.prop(ccam, "fisheye_fov", text="Field of View")
+                    
+                elif ccam.panorama_type == 'FISHEYE_EQUISOLID':
+                    row = col.row()
+                    row.prop(ccam, "fisheye_lens", text="Lens")
+                    row.prop(ccam, "fisheye_fov", text="FOV")
+                    
+                elif ccam.panorama_type == 'EQUIRECTANGULAR':
+                    row = col.row()
+                    row.prop(ccam, "latitude_min", text="Latitude Min")
+                    row.prop(ccam, "longitude_min", text="Longitude Min")
+                    row = col.row()                            
+                    row.prop(ccam, "latitude_max", text="Latitude Max")
+                    row.prop(ccam, "longitude_max", text="Longitude Max")
+        
+        row = col.row()
+        row.label(text="Shift:")
+        row.label(text="Clip:")
+        row = col.row()
+        row.prop(cam, "shift_x", text="Horizontal")
+        row.prop(cam, "clip_start", text="Start")
+        row = col.row()
+        row.prop(cam, "shift_y", text="Vertical")
+        row.prop(cam, "clip_end", text="End")
+        layout.label(text="Custom Resolution:")
+        row = layout.row(align=False)
+        row.prop(context.active_object.camera_custom_resolution_settings_pointer_prop, "Custom_Horizontal_Resolution", text="Horizontal")
+        row.prop(context.active_object.camera_custom_resolution_settings_pointer_prop, "Custom_Vertical_Resolution", text="Vertical")
+        
+    def invoke(self, context, event):
+        
+        SetCameraCustomResolution(self, context)
+        
+        if context.object:
+            if context.object.select_get():
+                context.object.select_set(state=False)
+        cam=bpy.data.objects[self.camera]
+        cam.select_set(state=True)
+        context.view_layer.objects.active = cam
+        context.scene.camera=cam
+
+        wm = context.window_manager
+        return wm.invoke_popup(self)
+
 #--------------------------------------------------------------------------------------
 # C O M M O N   D R A W   P A N E L
 #--------------------------------------------------------------------------------------
@@ -232,13 +317,13 @@ def common_draw(self,layout,context):
             cams.sort(key=str.lower)
             clist.append((coll.name, cams))
 
+    tm = bpy.context.scene.timeline_markers
+    cur_frame = context.scene.frame_current
+    frame_markers = [marker for marker in tm if marker.frame == cur_frame]
+
     box = layout
-    row = box.row(align = False)
-    row.operator("cameras.camera_view_on", text="Camera View On", icon="VIEW_CAMERA")
-    row.operator("cameras.camera_view_off", text="Camera View Off", icon="CAMERA_DATA")
-    box.operator("cameras.view_from_selected", text="View from Selected", icon="TRIA_RIGHT")
-    box.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="TRIA_RIGHT")
-    box.operator("cameras.new_from_view", text="New Camera from View", icon="TRIA_RIGHT")
+    box.operator("cameras.new_from_view", text="Add Camera to View", icon="ADD")
+    box.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="CON_CAMERASOLVER")
     box.separator()
     row = box.row(align=True)
     row.prop(context.scene, "sort_cameras", text=" ", expand=True)
@@ -249,25 +334,60 @@ def common_draw(self,layout,context):
     if sort_option == sorting_cameras_options[0][0]:
         cam_list=[cam.name for cam in context.scene.collection.all_objects if cam.type=='CAMERA']
         cam_list.sort(key=str.lower)
-        for cam in cam_list:
+        if not cam_list:
             row = boxframecolumn.row(align=True)
-            row.operator("cameras.set_view", text=cam).camera=cam
-            row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
-            row.operator("cameras.bind_to_marker", text="", icon="MARKER").camera=cam
-            row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
+            row.alignment = "CENTER"
+            row.alert = True
+            row.label(text="No cameras in this scene", icon= "ERROR")
+        else:
+            for cam in cam_list:
+                row = boxframecolumn.row(align=True)
+                row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
+                row.operator("cameras.camera_view_off"
+                    if context.area.spaces[0].region_3d.view_perspective == 'CAMERA'
+                    and bpy.context.space_data.camera is bpy.context.scene.objects[cam] else "cameras.set_view",
+                    text=cam, icon="CHECKBOX_HLT"
+                    if bpy.context.space_data.camera is bpy.context.scene.objects[cam]
+                    and context.object.type == 'CAMERA'
+                    and context.area.spaces[0].region_3d.view_perspective == 'CAMERA'
+                    else "CHECKBOX_DEHLT").camera=cam
+                row.operator("cameras.delete_camera_marker"
+                    if len(frame_markers) >= 1 and frame_markers[0].name == cam else "cameras.bind_to_marker",
+                    text="", icon="MARKER_HLT" if len(frame_markers) >= 1 and frame_markers[0].name == cam else "MARKER").camera=cam
+                row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
+                row.separator()
+                row.operator("camera.settings", text="", icon="TRIA_RIGHT").camera=cam
+                
     elif sort_option == sorting_cameras_options[1][0]:
         collcamlist=[]
         master_coll = context.scene.collection
         coll_rec(master_coll, collcamlist)
         collcamlist.sort()
-        for coll in collcamlist:
-            boxframecolumn.label(text=coll[0])
-            for cam in coll[1]:
-                row = boxframecolumn.row(align=True)
-                row.operator("cameras.set_view", text=cam).camera=cam
-                row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
-                row.operator("cameras.bind_to_marker", text="", icon="MARKER").camera=cam
-                row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
+        if not collcamlist:
+            row = boxframecolumn.row(align=True)
+            row.alignment = "CENTER"
+            row.alert = True
+            row.label(text="No cameras in this scene", icon= "ERROR")
+        else:
+            for coll in collcamlist:
+                boxframecolumn.label(text=coll[0])
+                for cam in coll[1]:
+                    row = boxframecolumn.row(align=True)
+                    row.operator("cameras.select", text="", icon="RESTRICT_SELECT_OFF").camera=cam
+                    row.operator("cameras.camera_view_off"
+                        if context.area.spaces[0].region_3d.view_perspective == 'CAMERA'
+                        and bpy.context.space_data.camera is bpy.context.scene.objects[cam] else "cameras.set_view",
+                        text=cam, icon="CHECKBOX_HLT"
+                        if bpy.context.space_data.camera is bpy.context.scene.objects[cam]
+                        and context.object.type == 'CAMERA'
+                        and context.area.spaces[0].region_3d.view_perspective == 'CAMERA'
+                        else "CHECKBOX_DEHLT").camera=cam
+                    row.operator("cameras.delete_camera_marker"
+                        if len(frame_markers) >= 1 and frame_markers[0].name == cam else "cameras.bind_to_marker",
+                        text="", icon="MARKER_HLT" if len(frame_markers) >= 1 and frame_markers[0].name == cam else "MARKER").camera=cam
+                    row.operator("cameras.delete", text="", icon="PANEL_CLOSE").camera=cam
+                    row.separator()
+                    row.operator("camera.settings", text="", icon="TRIA_RIGHT").camera=cam
 
 #--------------------------------------------------------------------------------------
 # P A N E L
@@ -293,56 +413,30 @@ class VIEW3D_PT_FloatingPanel(Operator):
         self.report({'INFO'}, self.my_enum)
         return {'FINISHED'}
 
-# DOCKED IN SIDE PANEL
-class VIEW3D_PT_DockedInSidePanel(Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "View"
-    bl_label = "Cameras Lister"
-    
-    def draw(self, context):
-        col = self.layout.column(align=True)
-        common_draw(self, col, context)
-
-# ADDON PREFERENCES
-class CamerasListerPreferences(AddonPreferences):
-    bl_idname = __name__
-
-    def sp_toggle(self, context):
-        if self.add_side_panel:
-            bpy.utils.register_class(VIEW3D_PT_DockedInSidePanel)
-        else:
-            if hasattr(bpy.types, 'VIEW3D_PT_DockedInSidePanel'):
-                bpy.utils.unregister_class(VIEW3D_PT_DockedInSidePanel)
-                
-    add_side_panel: bpy.props.BoolProperty(name="side panel", default=False, update=sp_toggle)
-
-    def draw(self, context):
-        layout = self.layout
-        layout.prop(self, "add_side_panel", text="Add CamerasLister to Side Panel")
-
 #--------------------------------------------------------------------------------------
 # R E G I S T R Y
 #--------------------------------------------------------------------------------------
 
 classes = (
-    CameraViewOn,
+    Camera_Custom_Resolution_Settings,
     CameraViewOff,
-    ViewFromSelectedCamera,
     AlignSelectedCameraToView,
     NewCameraFromView,
     SetCameraView,
     SelectCamera,
     BindCameraToMarker,
+    Delete_Camera_Marker,
     DeleteCamera,
+    PanelButton_CameraSettings,
     VIEW3D_PT_FloatingPanel,
-    CamerasListerPreferences
 )
 
 def register():
     from bpy.utils import register_class
     for cls in classes:
         register_class(cls)
+
+    Object.camera_custom_resolution_settings_pointer_prop = bpy.props.PointerProperty(type = Camera_Custom_Resolution_Settings)
 
     wm = bpy.context.window_manager
 
@@ -355,8 +449,8 @@ def unregister():
     from bpy.utils import unregister_class
     for cls in classes:
         unregister_class(cls)
-    if hasattr(bpy.types, 'VIEW3D_PT_DockedInSidePanel'):
-        bpy.utils.unregister_class(VIEW3D_PT_DockedInSidePanel)
+    
+    del Object.Pointer_Camera_Custom_Resolution_Settings
 
     addon_keymaps = []
     
