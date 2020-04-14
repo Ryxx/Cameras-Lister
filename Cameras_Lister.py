@@ -1,21 +1,3 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
 bl_info = {
     "name": "Cameras Lister",
     "blender": (2, 82, 0),
@@ -101,6 +83,25 @@ class NewCameraFromView(bpy.types.Operator):
 
         return{'FINISHED'}
 
+# RENDER ENGINE OPTIONS
+def update_render_engine(self, context):
+    selected_engine = context.scene.set_render_engine
+    
+    if selected_engine == render_engine_options[0][0]:
+        bpy.context.scene.render.engine = 'BLENDER_EEVEE'
+    if selected_engine == render_engine_options[1][0]:
+        bpy.context.scene.render.engine = 'CYCLES'
+
+render_engine_options = [
+        ("eevee", "EEVEE", ""),
+        ("cycles", "CYCLES", "")]
+
+bpy.types.Scene.set_render_engine = bpy.props.EnumProperty(
+    items=render_engine_options,
+    description="Set render engine",
+    default= "eevee",
+    update = update_render_engine)
+
 # SORTING CAMERAS OPTIONS
 sorting_cameras_options = [
         ("alphabetically", "Alphabetically", ""),
@@ -123,6 +124,8 @@ class SetCameraView(bpy.types.Operator):
     def execute(self,context):
         bpy.ops.cameras.select(camera=self.camera)
         bpy.ops.view3d.object_as_camera()
+        
+        bpy.ops.view3d.view_center_camera()
         
         SetCameraCustomResolution(self, context)
 
@@ -303,10 +306,10 @@ class PanelButton_CameraSettings(bpy.types.Operator):
         return wm.invoke_popup(self)
 
 #--------------------------------------------------------------------------------------
-# C O M M O N   D R A W   P A N E L
+# C A M E R A S   L I S T E R   P A N E L
 #--------------------------------------------------------------------------------------
 
-# COMMON DRAW
+# CAMERAS LISTER PANEL
 def common_draw(self,layout,context):
     def coll_rec(coll, clist):
         if coll.children:
@@ -322,12 +325,34 @@ def common_draw(self,layout,context):
     frame_markers = [marker for marker in tm if marker.frame == cur_frame]
 
     box = layout
-    box.operator("cameras.new_from_view", text="Add Camera to View", icon="ADD")
-    box.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="CON_CAMERASOLVER")
+    row = box.row(align=False)
+    row.scale_x = 1.8
+    row.scale_y = 1.8
+    row.operator("render.render", text="", icon="RENDER_STILL")
+    row.operator("render.render", text="", icon="RENDER_ANIMATION").animation=True
+    row.operator("render.view_show", text="", icon="IMAGE_DATA")
+    if ((context.area.spaces[0].region_3d.view_perspective == 'PERSP' or context.area.spaces[0].region_3d.view_perspective == 'ORTHO')
+    and context.area.spaces.active.use_render_border == False):
+        row.operator("view3d.render_border", text="", icon="BORDERMOVE")
+    elif ((context.area.spaces[0].region_3d.view_perspective == 'PERSP' or context.area.spaces[0].region_3d.view_perspective == 'ORTHO')
+    and context.area.spaces.active.use_render_border == True):
+        row.alert = True
+        row.operator("view3d.clear_render_border", text="", icon="BORDERMOVE")
+    if context.area.spaces[0].region_3d.view_perspective == 'CAMERA' and bpy.data.scenes["Scene"].render.use_border == False:
+        row.operator("view3d.render_border", text="", icon="BORDERMOVE")
+    if context.area.spaces[0].region_3d.view_perspective == 'CAMERA' and bpy.data.scenes["Scene"].render.use_border == True:
+        row.alert = True
+        row.operator("view3d.clear_render_border", text="", icon="BORDERMOVE")
+    row.prop(context.scene, "set_render_engine", text=" ", expand=True)
     box.separator()
-    row = box.row(align=True)
+    row = box.row(align=False)
+    row.scale_y = 1.2
+    row.operator("cameras.new_from_view", text="Add Camera to View", icon="ADD")
+    row.operator("cameras.align_selected_to_view", text="Align Selected to View", icon="CON_CAMERASOLVER")
+    box.separator()
+    boxframe = box.box()
+    row = boxframe.row(align=True)
     row.prop(context.scene, "sort_cameras", text=" ", expand=True)
-    box.separator()
     boxframe = box.box()
     boxframecolumn = boxframe.column()
     sort_option = context.scene.sort_cameras
