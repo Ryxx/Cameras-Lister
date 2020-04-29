@@ -122,12 +122,19 @@ class SetCameraView(bpy.types.Operator):
     camera: bpy.props.StringProperty()
 
     def execute(self,context):
-        bpy.ops.cameras.select(camera=self.camera)
-        bpy.ops.view3d.object_as_camera()
         
-        bpy.ops.view3d.view_center_camera()
-        
-        SetCameraCustomResolution(self, context)
+        if bpy.context.object.hide_get(view_layer=None):
+            bpy.context.object.hide_set(False)
+            bpy.ops.cameras.select(camera=self.camera)
+            bpy.ops.view3d.object_as_camera()
+            bpy.ops.view3d.view_center_camera()
+            SetCameraCustomResolution(self, context)
+            bpy.context.object.hide_set(True)
+        else:
+            bpy.ops.cameras.select(camera=self.camera)
+            bpy.ops.view3d.object_as_camera()
+            bpy.ops.view3d.view_center_camera()
+            SetCameraCustomResolution(self, context)
 
         return{'FINISHED'}
 
@@ -149,9 +156,14 @@ class SelectCamera(bpy.types.Operator):
         cam.select_set(state=True)
         context.view_layer.objects.active = cam
         context.scene.camera=cam
-
-        SetCameraCustomResolution(self, context)
-
+        
+        if bpy.context.object.hide_get(view_layer=None):
+            bpy.context.object.hide_set(False)
+            SetCameraCustomResolution(self, context)
+            bpy.context.object.hide_set(True)
+        else:
+            SetCameraCustomResolution(self, context)
+        
         return{'FINISHED'}
 
 # BIND CAMERA TO MARKER
@@ -287,12 +299,15 @@ class PanelButton_CameraSettings(bpy.types.Operator):
         row.prop(cam, "clip_end", text="End")
         layout.label(text="Custom Resolution:")
         row = layout.row(align=False)
-        row.prop(context.active_object.camera_custom_resolution_settings_pointer_prop, "Custom_Horizontal_Resolution", text="Horizontal")
-        row.prop(context.active_object.camera_custom_resolution_settings_pointer_prop, "Custom_Vertical_Resolution", text="Vertical")
+        if bpy.context.object.hide_get(view_layer=None):
+            rowbox = row.box()
+            rowbox.alert =True
+            rowbox.label(text="Unhide Camera in viewport to setup resolution", icon= "ERROR")
+        else:
+            row.prop(context.active_object.camera_custom_resolution_settings_pointer_prop, "Custom_Horizontal_Resolution", text="Horizontal")
+            row.prop(context.active_object.camera_custom_resolution_settings_pointer_prop, "Custom_Vertical_Resolution", text="Vertical")
         
     def invoke(self, context, event):
-        
-        SetCameraCustomResolution(self, context)
         
         if context.object:
             if context.object.select_get():
@@ -301,6 +316,13 @@ class PanelButton_CameraSettings(bpy.types.Operator):
         cam.select_set(state=True)
         context.view_layer.objects.active = cam
         context.scene.camera=cam
+
+        if bpy.context.object.hide_get(view_layer=None):
+            bpy.context.object.hide_set(False)
+            SetCameraCustomResolution(self, context)
+            bpy.context.object.hide_set(True)
+        else:
+            SetCameraCustomResolution(self, context)
 
         wm = context.window_manager
         return wm.invoke_popup(self)
