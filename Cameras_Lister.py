@@ -123,13 +123,29 @@ class SetCameraView(bpy.types.Operator):
 
     def execute(self,context):
         
-        if bpy.context.object.hide_get(view_layer=None):
+        if bpy.context.object.hide_get(view_layer=None) == True and bpy.context.object.hide_viewport == False:
             bpy.context.object.hide_set(False)
             bpy.ops.cameras.select(camera=self.camera)
             bpy.ops.view3d.object_as_camera()
             bpy.ops.view3d.view_center_camera()
             SetCameraCustomResolution(self, context)
             bpy.context.object.hide_set(True)
+        elif bpy.context.object.hide_get(view_layer=None) == False and bpy.context.object.hide_viewport == True:
+            bpy.context.object.hide_viewport = False
+            bpy.ops.cameras.select(camera=self.camera)
+            bpy.ops.view3d.object_as_camera()
+            bpy.ops.view3d.view_center_camera()
+            SetCameraCustomResolution(self, context)
+            bpy.context.object.hide_viewport = True
+        elif bpy.context.object.hide_get(view_layer=None) == True and bpy.context.object.hide_viewport == True:
+            bpy.context.object.hide_set(False)
+            bpy.context.object.hide_viewport = False
+            bpy.ops.cameras.select(camera=self.camera)
+            bpy.ops.view3d.object_as_camera()
+            bpy.ops.view3d.view_center_camera()
+            SetCameraCustomResolution(self, context)
+            bpy.context.object.hide_set(True)
+            bpy.context.object.hide_viewport = True
         else:
             bpy.ops.cameras.select(camera=self.camera)
             bpy.ops.view3d.object_as_camera()
@@ -157,10 +173,20 @@ class SelectCamera(bpy.types.Operator):
         context.view_layer.objects.active = cam
         context.scene.camera=cam
         
-        if bpy.context.object.hide_get(view_layer=None):
+        if bpy.context.object.hide_get(view_layer=None) == True and bpy.context.object.hide_viewport == False:
             bpy.context.object.hide_set(False)
             SetCameraCustomResolution(self, context)
             bpy.context.object.hide_set(True)
+        elif bpy.context.object.hide_get(view_layer=None) == False and bpy.context.object.hide_viewport == True:
+            bpy.context.object.hide_viewport = False
+            SetCameraCustomResolution(self, context)
+            bpy.context.object.hide_viewport = True
+        elif bpy.context.object.hide_get(view_layer=None) == True and bpy.context.object.hide_viewport == True:
+            bpy.context.object.hide_set(False)
+            bpy.context.object.hide_viewport = False
+            SetCameraCustomResolution(self, context)
+            bpy.context.object.hide_set(True)
+            bpy.context.object.hide_viewport = True
         else:
             SetCameraCustomResolution(self, context)
         
@@ -299,7 +325,7 @@ class PanelButton_CameraSettings(bpy.types.Operator):
         row.prop(cam, "clip_end", text="End")
         layout.label(text="Custom Resolution:")
         row = layout.row(align=False)
-        if bpy.context.object.hide_get(view_layer=None):
+        if bpy.context.object.hide_get(view_layer=None) == True or bpy.context.object.hide_viewport == True:
             rowbox = row.box()
             rowbox.alert =True
             rowbox.label(text="Unhide Camera in viewport to setup resolution", icon= "ERROR")
@@ -317,10 +343,20 @@ class PanelButton_CameraSettings(bpy.types.Operator):
         context.view_layer.objects.active = cam
         context.scene.camera=cam
 
-        if bpy.context.object.hide_get(view_layer=None):
+        if bpy.context.object.hide_get(view_layer=None) == True and bpy.context.object.hide_viewport == False:
             bpy.context.object.hide_set(False)
             SetCameraCustomResolution(self, context)
             bpy.context.object.hide_set(True)
+        elif bpy.context.object.hide_get(view_layer=None) == False and bpy.context.object.hide_viewport == True:
+            bpy.context.object.hide_viewport = False
+            SetCameraCustomResolution(self, context)
+            bpy.context.object.hide_viewport = True
+        elif bpy.context.object.hide_get(view_layer=None) == True and bpy.context.object.hide_viewport == True:
+            bpy.context.object.hide_set(False)
+            bpy.context.object.hide_viewport = False
+            SetCameraCustomResolution(self, context)
+            bpy.context.object.hide_set(True)
+            bpy.context.object.hide_viewport = True
         else:
             SetCameraCustomResolution(self, context)
 
